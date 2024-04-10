@@ -7,6 +7,7 @@ import maya.app.renderSetup.model.renderSetup as renderSetup
    carpaint01, carpaint02
 '''
 
+
 def read_excel_rows(file_path):
     # Load the Excel file
     df = pd.read_excel(file_path)
@@ -16,6 +17,7 @@ def read_excel_rows(file_path):
 
     # return the list
     return rows_as_lists
+
 
 def create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02):
 
@@ -64,6 +66,7 @@ def create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, me
     shader02ColOverride.setAttrValue([c2r, c2g, c2b])
     shader02MetallicOverride.setAttrValue(metallic02)
     shader02ClearcoatOverride.setAttrValue(clearcoat02)
+
 
 # Full path to the Excel file with the config data
 file_path = "C:/Users/florianbehr/Documents/_repository/configurator/testconfig.xlsx"
