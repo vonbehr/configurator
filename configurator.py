@@ -8,7 +8,7 @@ import maya.api.OpenMaya as om
    carpaint01, carpaint02
 '''
 
-def read_excel_rows(file_path):
+def read_excel_rows(file_path: str) -> list:
     # Load the Excel file
     try:
         df = pd.read_excel(file_path)
@@ -22,7 +22,7 @@ def read_excel_rows(file_path):
     # return the list
     return rows_as_lists
 
-def create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02):
+def create_rl(rl_name: str, c1r: float, c1g: float, c1b: float, metallic01: float, clearcoat01: float, c2r: float, c2g: float, c2b: float, metallic02: float, clearcoat02: float):
 
     rs = renderSetup.instance()
 
