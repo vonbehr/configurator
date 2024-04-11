@@ -1,23 +1,26 @@
 import pandas as pd
 import math
 import maya.app.renderSetup.model.renderSetup as renderSetup
+import maya.api.OpenMaya as om
 
 '''
    Two carpaint shaders assigned to the correct geo:
    carpaint01, carpaint02
 '''
 
-
 def read_excel_rows(file_path):
     # Load the Excel file
-    df = pd.read_excel(file_path)
+    try:
+        df = pd.read_excel(file_path)
+    except FileNotFoundError:
+        om.MGlobal.displayInfo(f"Excel file not found. {file_path}")
+        return None
 
     # Convert each row to a list and collect them in a list
     rows_as_lists = df.values.tolist()
 
     # return the list
     return rows_as_lists
-
 
 def create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02):
 
@@ -67,50 +70,47 @@ def create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, me
     shader02MetallicOverride.setAttrValue(metallic02)
     shader02ClearcoatOverride.setAttrValue(clearcoat02)
 
-
 # Full path to the Excel file with the config data
 file_path = "C:/Users/florianbehr/Documents/_repository/configurator/testconfig.xlsx"
+
 rows = read_excel_rows(file_path)
 
-# iterate over rows, extract data and call function to create render layer.
-for row in rows:
-    print(row)
-    if math.isnan(row[4]) is True:
-        print("NaN")
+if rows != None:
+    # iterate over rows, extract data and call function to create render layer.
+    for row in rows:
+        rl_name = row[0]
 
-    rl_name = row[0]
+        c1r = row[1]
+        c1g = row[2]
+        c1b = row[3]
 
-    c1r = row[1]
-    c1g = row[2]
-    c1b = row[3]
-
-    if math.isnan(row[4]) is True:
-        c2r = c1r
-        c2g = c1g
-        c2b = c1b
-    else:
-        c2r = row[4]
-        c2g = row[5]
-        c2b = row[6]
-
-    metallic01 = row[7]
-
-    if math.isnan(row[8]) is True:
-        metallic02 = metallic01
-    else:
-        metallic02 = row[8]
-
-    if row[9] == 1:
-        clearcoat01 = 1.0
-    else:
-        clearcoat01 = 0.5
-
-    if math.isnan(row[10]) is True:
-        clearcoat02 = clearcoat01
-    else:
-        if row[10] == 0:
-            clearcoat02 = 0.5
+        if math.isnan(row[4]) is True:
+            c2r = c1r
+            c2g = c1g
+            c2b = c1b
         else:
-            clearcoat02 = 1.0
+            c2r = row[4]
+            c2g = row[5]
+            c2b = row[6]
 
-    create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02)
+        metallic01 = row[7]
+
+        if math.isnan(row[8]) is True:
+            metallic02 = metallic01
+        else:
+            metallic02 = row[8]
+
+        if row[9] == 1:
+            clearcoat01 = 1.0
+        else:
+            clearcoat01 = 0.5
+
+        if math.isnan(row[10]) is True:
+            clearcoat02 = clearcoat01
+        else:
+            if row[10] == 0:
+                clearcoat02 = 0.5
+            else:
+                clearcoat02 = 1.0
+
+        create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02)
