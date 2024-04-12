@@ -1,4 +1,6 @@
 import pandas as pd
+from colormath.color_objects import sRGBColor
+import colormath
 import math
 import maya.app.renderSetup.model.renderSetup as renderSetup
 import maya.api.OpenMaya as om
@@ -69,6 +71,12 @@ def create_rl(rl_name: str, c1r: float, c1g: float, c1b: float, metallic01: floa
     shader02ColOverride.setAttrValue([c2r, c2g, c2b])
     shader02MetallicOverride.setAttrValue(metallic02)
     shader02ClearcoatOverride.setAttrValue(clearcoat02)
+
+def hex_to_rgb(hex: str) ->tuple:
+    srgb_obj = colormath.color_objects.sRGBColor.new_from_rgb_hex(hex)
+    return colormath.color_objects.sRGBColor.get_value_tuple(srgb_obj)
+
+
 
 # Full path to the Excel file with the config data
 file_path = "C:/Users/florianbehr/Documents/_repository/configurator/testconfig.xlsx"
