@@ -24,7 +24,8 @@ def read_excel_rows(file_path: str) -> list:
     # return the list
     return rows_as_lists
 
-def create_rl(rl_name: str, c1r: float, c1g: float, c1b: float, metallic01: float, clearcoat01: float, c2r: float, c2g: float, c2b: float, metallic02: float, clearcoat02: float):
+def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool):
+    # CONTINUE
 
     rs = renderSetup.instance()
 
@@ -83,42 +84,66 @@ file_path = "C:/Users/florianbehr/Documents/_repository/configurator/testconfig.
 
 rows = read_excel_rows(file_path)
 
+# Colorcode Name    SKIP    Hex SKIP    Type    SKIP    Twotone SKIP
+#   0       1       2       3   4       5       6       7       8
+
 if rows != None:
     # iterate over rows, extract data and call function to create render layer.
     for row in rows:
         rl_name = row[0]
 
-        c1r = row[1]
-        c1g = row[2]
-        c1b = row[3]
+        hex_color = row[3][1:]
+        color = hex_to_rgb(hex_color)
 
-        if math.isnan(row[4]) is True:
-            c2r = c1r
-            c2g = c1g
-            c2b = c1b
+        # if math.isnan(row[4]) is True:
+        #     c2r = c1r
+        #     c2g = c1g
+        #     c2b = c1b
+        # else:
+        #     c2r = row[4]
+        #     c2g = row[5]
+        #     c2b = row[6]
+
+        if row[5] == "Metallic":
+            metallic = True
+            clearcoat = True
+        elif row[5] == "Uni":
+            metallic = False
+            clearcoat = True
+        elif row[5] == "Frozen":
+            metallic = True
+            clearcoat = False
         else:
-            c2r = row[4]
-            c2g = row[5]
-            c2b = row[6]
+            om.MGlobal.displayInfo("Could not parse correct Clearcoat info. Please check Excel file.")
+            continue
 
-        metallic01 = row[7]
-
-        if math.isnan(row[8]) is True:
-            metallic02 = metallic01
+        if row[7] == "Individual TT":
+            twotone = True
+        elif row[7] == "No":
+            twotone = False
         else:
-            metallic02 = row[8]
+            om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
+            continue
 
-        if row[9] == 1:
-            clearcoat01 = 1.0
-        else:
-            clearcoat01 = 0.5
+        # metallic01 = row[7]
 
-        if math.isnan(row[10]) is True:
-            clearcoat02 = clearcoat01
-        else:
-            if row[10] == 0:
-                clearcoat02 = 0.5
-            else:
-                clearcoat02 = 1.0
+        # if math.isnan(row[8]) is True:
+            # metallic02 = metallic01
+        # else:
+            # metallic02 = row[8]
 
-        create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02)
+        # if row[9] == 1:
+            # clearcoat01 = 1.0
+        # else:
+            # clearcoat01 = 0.5
+
+        # if math.isnan(row[10]) is True:
+            # clearcoat02 = clearcoat01
+        # else:
+            # if row[10] == 0:
+                # clearcoat02 = 0.5
+            # else:
+                # clearcoat02 = 1.0
+
+        # create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02)
+        create_rl(rl_name, color, metallic, clearcoat)
