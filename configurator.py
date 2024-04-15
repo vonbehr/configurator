@@ -2,6 +2,8 @@ import pandas as pd
 from colormath.color_objects import sRGBColor
 import colormath
 import math
+import colour
+import numpy
 import maya.app.renderSetup.model.renderSetup as renderSetup
 import maya.api.OpenMaya as om
 
@@ -74,9 +76,47 @@ def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool):
     shader02ClearcoatOverride.setAttrValue(clearcoat02)
 
 def hex_to_rgb(hex: str) ->tuple:
+    '''
+    Convert a hex color into an RGB tuple. RGB value has a range of 0 - 1.
+
+    Args:
+        hex (str): Color in hex
+
+    Returns:
+        tuple: Color in RGB
+    '''
     srgb_obj = colormath.color_objects.sRGBColor.new_from_rgb_hex(hex)
+
     return colormath.color_objects.sRGBColor.get_value_tuple(srgb_obj)
 
+def srgb_to_aces(srgb_color: tuple) -> list:
+    '''
+    Convert color values from sRGB to ACEScg colorspace.
+
+    Args:
+        srgb_color (tuple): A tuple (or list) with 3 RGB values in the range from 0 to 1.
+
+    Returns:
+        list: 3 color values in the range from 0 to 1.
+    '''
+
+    cs_sRGB = colour.RGB_COLOURSPACES["sRGB"]
+    cs_ACEScg = colour.RGB_COLOURSPACES["ACEScg"]
+
+    source = numpy.array(srgb_color, dtype=numpy.core.float32)
+    converted = source.astype(dtype=numpy.core.float32)
+    acescg_color = colour.RGB_to_RGB(
+        converted,
+        cs_sRGB,
+        cs_ACEScg,
+        chromatic_adaptation_transform="CAT02",
+        # remove the sRGB transfer-function
+        apply_cctf_decoding=True,
+        # ACEScg defined a linear encode so will not do anything anyway
+        apply_cctf_encoding=True,
+    )
+
+    return acescg_color
 
 
 # Full path to the Excel file with the config data
