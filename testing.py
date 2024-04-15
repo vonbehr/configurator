@@ -1,15 +1,27 @@
-from colormath.color_objects import sRGBColor
-import colormath
+import colour
+import numpy
 
-# hex_list = ["#cb563b"]
 
-# hex = hex_list[0][1:]
-# print(hex)
 
-hex = "cb563b"
-rgb = tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
-print(rgb)
+COLORSPACE_sRGB = colour.RGB_COLOURSPACES["sRGB"]
+COLORSPACE_ACEScg = colour.RGB_COLOURSPACES["ACEScg"]
 
-srgb = colormath.color_objects.sRGBColor.new_from_rgb_hex(hex)
-print(srgb)
-print(colormath.color_objects.sRGBColor.get_value_tuple(srgb))
+
+def main():
+    source = numpy.array([0.138, 0.28, 0.164], dtype=numpy.core.float32)
+    converted = source.astype(dtype=numpy.core.float32)  # / 255
+    converted = colour.RGB_to_RGB(
+        converted,
+        COLORSPACE_sRGB,
+        COLORSPACE_ACEScg,
+        chromatic_adaptation_transform="CAT02",
+        # remove the sRGB transfer-function
+        apply_cctf_decoding=True,
+        # ACEScg defined a linear encode so will not do anything anyway
+        apply_cctf_encoding=True,
+    )
+    print(converted)
+
+
+if __name__ == "__main__":
+    main()
