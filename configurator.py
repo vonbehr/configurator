@@ -27,7 +27,16 @@ def read_excel_rows(file_path: str) -> list:
     return rows_as_lists
 
 def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool):
-    # CONTINUE
+
+    if metallic is True:
+        flake_density = 1
+    elif metallic is False:
+        flake_density = 0
+
+    if clearcoat is True:
+        coat_glossiness = 0.97
+    elif clearcoat is False:
+        coat_glossiness = 0.78
 
     rs = renderSetup.instance()
 
@@ -55,8 +64,8 @@ def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool):
 
     #  set values of overrides
     shader01ColOverride.setAttrValue([c1r, c1g, c1b])
-    shader01MetallicOverride.setAttrValue(metallic01)
-    shader01ClearcoatOverride.setAttrValue(clearcoat01)
+    shader01MetallicOverride.setAttrValue(flake_density)
+    shader01ClearcoatOverride.setAttrValue(coat_glossiness)
 
     # and again for the second shader
     shader02Col = renderlayer.createCollection("shaderCol02")
@@ -133,16 +142,8 @@ if rows != None:
         rl_name = row[0]
 
         hex_color = row[3][1:]
-        color = hex_to_rgb(hex_color)
-
-        # if math.isnan(row[4]) is True:
-        #     c2r = c1r
-        #     c2g = c1g
-        #     c2b = c1b
-        # else:
-        #     c2r = row[4]
-        #     c2g = row[5]
-        #     c2b = row[6]
+        srgb_color = hex_to_rgb(hex_color)
+        aces_color = srgb_to_aces(srgb_color)
 
         if row[5] == "Metallic":
             metallic = True
@@ -165,25 +166,5 @@ if rows != None:
             om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
             continue
 
-        # metallic01 = row[7]
-
-        # if math.isnan(row[8]) is True:
-            # metallic02 = metallic01
-        # else:
-            # metallic02 = row[8]
-
-        # if row[9] == 1:
-            # clearcoat01 = 1.0
-        # else:
-            # clearcoat01 = 0.5
-
-        # if math.isnan(row[10]) is True:
-            # clearcoat02 = clearcoat01
-        # else:
-            # if row[10] == 0:
-                # clearcoat02 = 0.5
-            # else:
-                # clearcoat02 = 1.0
-
         # create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02)
-        create_rl(rl_name, color, metallic, clearcoat)
+        create_rl(rl_name, aces_color, metallic, clearcoat)
