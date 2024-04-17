@@ -88,8 +88,7 @@ def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool, twoto
     shader01ClearcoatOverride = shader01Col.createAbsoluteOverride("carpaint01", "coat_glossiness")
 
     #  set values of overrides
-    shader01ColOverride.setAttrValue([c1r, c1g, c1b])
-    shader01MetallicOverride.setAttrValue(flake_density)
+    shader01ColOverride.setAttrValue(color)
     shader01ClearcoatOverride.setAttrValue(coat_glossiness)
 
     # and again for the second shader
@@ -105,9 +104,8 @@ def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool, twoto
     shader02ClearcoatOverride = shader02Col.createAbsoluteOverride("carpaint02", "coat_glossiness")
 
     # set override values for second shader
-    shader02ColOverride.setAttrValue([c2r, c2g, c2b])
-    shader02MetallicOverride.setAttrValue(metallic02)
-    shader02ClearcoatOverride.setAttrValue(clearcoat02)
+    shader02ColOverride.setAttrValue(color)
+    shader02ClearcoatOverride.setAttrValue(coat_glossiness)
 
 def hex_to_rgb(hex: str) ->tuple:
     '''
@@ -152,7 +150,7 @@ def srgb_to_aces(srgb_color: tuple) -> list:
 
     return acescg_color
 
-def configurator(filepath)
+def configurator(filepath):
 
     rows = read_excel_rows(filepath)
 
