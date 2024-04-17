@@ -12,12 +12,13 @@ import maya.api.OpenMaya as om
    carpaint01, carpaint02
 '''
 
-def read_excel_rows(file_path: str) -> list:
+
+def read_excel_rows(filepath: str) -> list:
     # Load the Excel file
     try:
-        df = pd.read_excel(file_path)
+        df = pd.read_excel(filepath)
     except FileNotFoundError:
-        om.MGlobal.displayInfo(f"Excel file not found. {file_path}")
+        om.MGlobal.displayInfo(f"Excel file not found. {filepath}")
         return None
 
     # Convert each row to a list and collect them in a list
@@ -26,12 +27,12 @@ def read_excel_rows(file_path: str) -> list:
     # return the list
     return rows_as_lists
 
-def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool):
+def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool, twotone: bool):
 
     if metallic is True:
-        flake_density = 1
+        carpaint_shader = "carpaint01"
     elif metallic is False:
-        flake_density = 0
+        carpaint_shader = "carpaint02"
 
     if clearcoat is True:
         coat_glossiness = 0.97
@@ -41,6 +42,30 @@ def create_rl(rl_name: str, color: tuple, metallic: bool, clearcoat: bool):
     rs = renderSetup.instance()
 
     rs.switchToLayerUsingLegacyName("defaultRenderLayer")
+
+    '''
+    CONTINUE
+    Scene has 2 SGs assigned to regular and duo tone geo.
+        carpaintSG
+        duotoneSG
+    Scene has 3 carpaint shader:
+        1 Metallic regular (CarPaint2Mtl)
+            metCarpaint
+        1 Metallic duo tone (CarPaint2Mtl)
+            metCarpaintDuo
+        1 full tone (VrayMtl)
+            fulltoneCarpaint
+
+    Collection for everything (*)
+    Collection for carpaintSG
+        Shader Override
+    Collection for duotoneSG
+        Shader Override
+    Collection for shader01
+        Overrides for color, clearcoat
+    Collection for shader02
+        Overrides for color, clearcoat
+    '''
 
     # Create and append the render layer for the paint variant
     renderlayer = rs.createRenderLayer(rl_name)
@@ -127,44 +152,45 @@ def srgb_to_aces(srgb_color: tuple) -> list:
 
     return acescg_color
 
+def configurator(filepath)
 
-# Full path to the Excel file with the config data
-file_path = "C:/Users/florianbehr/Documents/_repository/configurator/testconfig.xlsx"
+    rows = read_excel_rows(filepath)
 
-rows = read_excel_rows(file_path)
+    # Colorcode Name    SKIP    Hex SKIP    Type    SKIP    Twotone SKIP
+    #   0       1       2       3   4       5       6       7       8
 
-# Colorcode Name    SKIP    Hex SKIP    Type    SKIP    Twotone SKIP
-#   0       1       2       3   4       5       6       7       8
+    if rows != None:
+        # iterate over rows, extract data and call function to create render layer.
+        for row in rows:
+            rl_name = row[0]
 
-if rows != None:
-    # iterate over rows, extract data and call function to create render layer.
-    for row in rows:
-        rl_name = row[0]
+            hex_color = row[3][1:]
+            srgb_color = hex_to_rgb(hex_color)
+            aces_color = srgb_to_aces(srgb_color)
 
-        hex_color = row[3][1:]
-        srgb_color = hex_to_rgb(hex_color)
-        aces_color = srgb_to_aces(srgb_color)
+            if row[5] == "Metallic":
+                metallic = True
+                clearcoat = True
+            elif row[5] == "Uni":
+                metallic = False
+                clearcoat = True
+            elif row[5] == "Frozen":
+                metallic = True
+                clearcoat = False
+            else:
+                om.MGlobal.displayInfo("Could not parse correct Clearcoat info. Please check Excel file.")
+                continue
 
-        if row[5] == "Metallic":
-            metallic = True
-            clearcoat = True
-        elif row[5] == "Uni":
-            metallic = False
-            clearcoat = True
-        elif row[5] == "Frozen":
-            metallic = True
-            clearcoat = False
-        else:
-            om.MGlobal.displayInfo("Could not parse correct Clearcoat info. Please check Excel file.")
-            continue
+            if row[7] == "Individual TT":
+                twotone = True
+            elif row[7] == "No":
+                twotone = False
+            else:
+                om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
+                continue
 
-        if row[7] == "Individual TT":
-            twotone = True
-        elif row[7] == "No":
-            twotone = False
-        else:
-            om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
-            continue
+            # create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02)
+            create_rl(rl_name, aces_color, metallic, clearcoat, twotone)
 
-        # create_rl(rl_name, c1r, c1g, c1b, metallic01, clearcoat01, c2r, c2g, c2b, metallic02, clearcoat02)
-        create_rl(rl_name, aces_color, metallic, clearcoat)
+
+configurator("C:/Users/florianbehr/Documents/_repository/configurator/testconfig.xlsx")
