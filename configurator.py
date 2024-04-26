@@ -9,12 +9,41 @@ import maya.api.OpenMaya as om
 import maya.cmds as cmds
 
 '''
-   Two carpaint shaders assigned to the correct geo:
-   carpaint01, carpaint02
+    The car has two VRaySwitchMaterials assigned to the correct geo:
+    base_paint, twotone_paint.
+
+    base_paint has two shaders connected:
+        0: solid_carpaint (VRayMtl):
+        1: metallic_carpaint (VRayCarpaint)
+
+    twotone_paint has four shaders conencted:
+        0: solid_carpaint
+        1: metallic_carpaint
+        2: twowone_black (VrayCarpaint2)
+        3: twotone_gray (VRayCarpaint2)
+
+    All frozen carpaints are metallic.
+    All two-tone carpaints are metallic.
+
+    Two-tone black = [ 0.01168132  0.01224731  0.01620415]
+    Two-tone gray = [ 0.61188067  0.59859144  0.5638031 ]
+
+    There is one renderlayer per color variation (only one color, two-tone black, two tone grey).
+    Each renderlayer has one collection for each switch material (filter: shaders).
+    Each collection has an absolute override on the .materialsSwitch Attribute to select the correct shader for the layer.
 '''
 
 
 def read_excel_rows(filepath: str) -> list:
+    '''
+    Read the Excel file passed as an agument and return the rows as a list
+
+    Args:
+        filepath (str): Excel file to read
+
+    Returns:
+        list: The rows of the file as a list of lists
+    '''
     # Load the Excel file
     try:
         df = pd.read_excel(filepath)
@@ -28,21 +57,19 @@ def read_excel_rows(filepath: str) -> list:
     # return the list
     return rows_as_lists
 
-def create_rl(rl_name: str, color1: tuple, color2: tuple, metallic: bool, clearcoat: bool):
+def create_rl(rl_name: str, shader1: int, shader2: int, color: tuple, clearcoat: bool):
+    '''
+    Create renderlayers, collections and overrides based on the arguments.
 
-    if metallic is True:
-        carpaint_shader = "carpaint01"
-    elif metallic is False:
-        carpaint_shader = "carpaint02"
+    Args:
+        rl_name (str): Name of the renderlayer
+        shader1 (int): Switch shader ID to use
+        shader2 (int): Switch shader ID to use
+        color (tuple): color for the override
+        clearcoat (bool): Is this a clearcoat or frozen shader
+    '''
 
-    if duotone is True:
-        duotone_shader = "carpaint03"
-    elif duotone is False:
-        duotone_shader = carpaint_shader
-
-    # carpaint_sg = cmds.listConnections(carpaint_shader + ".outColor", type="shadingEngine")[0]
-    # duotone_sg = cmds.listConnections(duotone_shader + ".outColor", type="shadingEngine")[0]
-
+    # set glossiness for override
     if clearcoat is True:
         coat_glossiness = 0.97
     elif clearcoat is False:
@@ -52,30 +79,6 @@ def create_rl(rl_name: str, color1: tuple, color2: tuple, metallic: bool, clearc
 
     rs.switchToLayerUsingLegacyName("defaultRenderLayer")
 
-    '''
-    CONTINUE
-    Scene has 2 SGs assigned to regular and duo tone geo.
-        carpaintSG
-        duotoneSG
-    Scene has 3 carpaint shader:
-        1 Metallic regular (CarPaint2Mtl)
-            metCarpaint
-        1 Metallic duo tone (CarPaint2Mtl)
-            metCarpaintDuo
-        1 full tone (VrayMtl)
-            fulltoneCarpaint
-
-    Collection for everything (*)
-    Collection for carpaintSG
-        Shader Override
-    Collection for duotoneSG
-        Shader Override
-    Collection for shader01
-        Overrides for color, clearcoat
-    Collection for shader02
-        Overrides for color, clearcoat
-    '''
-
     # Create and append the render layer for the paint variant
     renderlayer = rs.createRenderLayer(rl_name)
 
@@ -84,56 +87,55 @@ def create_rl(rl_name: str, color1: tuple, color2: tuple, metallic: bool, clearc
     # Set up collection 1 to contain the whole scene, and the other collections the sahders
     mainCol.getSelector().setPattern('*')
 
+    ####################
+    # Switch materials #
+    ####################
+
+    # create collections
+    switch1_col = renderlayer.createCollection("switch1Col001")
+    switch2_col = renderlayer.createCollection("switch2Col001")
+
+    # set filter to shader
+    switch1_col.getSelector().setFilterType(3)
+    switch2_col.getSelector().setFilterType(3)
+
+    # add the shader to the collections
+    switch1_col.getSelector().staticSelection.set(["base_paint"])
+    switch2_col.getSelector().staticSelection.set(["twotone_paint"])
+
+    # create the overrides
+    switch1_override = switch1_col.createAbsoluteOverride("switch001", "materialsSwitch")
+    switch2_override = switch2_col.createAbsoluteOverride("switch002", "materialsSwitch")
+
+    # set the values
+    switch1_override.setAttrValue(shader1)
+    switch2_override.setAttrValue(shader2)
+
+
     ###################
-    # Shader Override #
+    # Carpaint shader #
     ###################
 
-    # And collections for the two shading groups
-    carpaint_sg_col = renderlayer.createCollection("carpaintSGCol001")
-    duotone_sg_col = renderlayer.createCollection("duotoneSGCol001")
-
-    # set filter to SG
-    carpaint_sg_col.getSelector().setFilterType(5)
-    duotone_sg_col.getSelector().setFilterType(5)
-
-    # add shading groups to collections
-    carpaint_sg_col.getSelector().staticSelection.set(["carpaintSG"])
-    duotone_sg_col.getSelector().staticSelection.set(["duotoneSG"])
-
-    # create shader overrides and connect shaders
-    carpaint_sg_override = carpaint_sg_col.createAbsoluteOverride("carpaintSGOverride001", "shaderOverride")
-    duotone_sg_override = duotone_sg_col.createAbsoluteOverride("duotoneSGOverride001", "shaderOverride")
-
-    carpaint_sg_override.setShader(carpaint_shader)
-    duotone_sg_override.setShader(duotone_shader)
-
-    #################################
-    # Color and coat gloss override #
-    #################################
-
-    # create collections for shaders and add shaders
+    # create collection
     carpaint_col = renderlayer.createCollection("carpaint_col001")
-    duotoneCol = renderlayer.createCollection("duotoneCol001")
 
+    # set filter to shader
     carpaint_col.getSelector().setFilterType(3)
-    duotoneCol.getSelector().setFilterType(3)
 
-    carpaint_col.getSelector().staticSelection.set([carpaint_shader])
-    duotoneCol.getSelector().staticSelection.set([duotone_shader])
+    # add shader to collection and create overrides
+    # for metallic carpaints
+    if shader1 == 1:
+        carpaint_col.getSelector().staticSelection.set(["metallic_carpaint"])
+        color_override = carpaint_col.createAbsoluteOverride("carpaint_color_override001", "base_color")
+        clearcoat_override = carpaint_col.createAbsoluteOverride("carpaint_clearcoat_override001", "coat_glossiness")
+        color_override.setAttrValue(color)
+        clearcoat_override.setAttrValue(coat_glossiness)
 
-    # create overrides
-    # TODO: Attribute names are different for VRaymtl and VRayCarPaint.
-    carpaint_color_override = carpaint_col.createAbsoluteOverride("carpaint_color_override001", "base_color")
-    carpaint_clearcoat_override = carpaint_col.createAbsoluteOverride("carpaint_clearcoat_override001", "coat_glossiness")
-    duotone_color_override = duotoneCol.createAbsoluteOverride("duotone_color_override001", "base_color")
-    duotone_clearcoat_override = duotoneCol.createAbsoluteOverride("duotone_clearcoat_override001", "coat_glossiness")
-
-    #  set values of overrides
-    carpaint_color_override.setAttrValue(color1)
-    carpaint_clearcoat_override.setAttrValue(coat_glossiness)
-    duotone_color_override.setAttrValue(color2)
-    duotone_clearcoat_override.setAttrValue(coat_glossiness)
-
+    # and for solid carpaints
+    elif shader1 == 0:
+        carpaint_col.getSelector().staticSelection.set(["solid_carpaint"])
+        color_override = carpaint_col.createAbsoluteOverride("carpaint_color_override001", "color")
+        color_override.setAttrValue(color)
 
 def hex_to_rgb(hex: str) ->tuple:
     '''
@@ -178,7 +180,13 @@ def srgb_to_aces(srgb_color: tuple) -> list:
 
     return acescg_color
 
-def configurator(filepath):
+def configurator(filepath: str):
+    '''
+    Parse the rows of the excel file and create renderlayers based on the info.
+
+    Args:
+        filepath (str): FIlepath to Excel file with config.
+    '''
 
     rows = read_excel_rows(filepath)
 
@@ -194,38 +202,32 @@ def configurator(filepath):
             srgb_color = hex_to_rgb(hex_color)
             aces_color = srgb_to_aces(srgb_color)
 
-            # CONTINUE: Farbe anpassen, Stone Grey Vollton?
-            duotone_color1 = (0.03, 0.03, 0.03)
-            duotone_color2 = (0.25, 0.25, 0.25)
-
             if row[5] == "Metallic":
-                metallic = True
+                shader1 = 1
                 clearcoat = True
             elif row[5] == "Uni":
-                metallic = False
+                shader1 = 0
                 clearcoat = True
             elif row[5] == "Frozen":
-                metallic = True
+                shader1 = 1
                 clearcoat = False
             else:
                 om.MGlobal.displayInfo("Could not parse correct Clearcoat info. Please check Excel file.")
                 continue
 
             if row[7] == "Individual TT":
-                duotone = True
+                twotone = True
             elif row[7] == "No":
-                duotone = False
+                twotone = False
             else:
                 om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
                 continue
 
-            # create 3 renderlayer for dualtone variants
-            if duotone is True:
-                create_rl(rl_name, aces_color, aces_color, metallic, clearcoat)
-                create_rl(rl_name, aces_color, duotone_color1, metallic, clearcoat)
-                create_rl(rl_name, aces_color, duotone_color2, metallic, clearcoat)
-            else:
-                create_rl(rl_name, aces_color, aces_color, metallic, clearcoat)
+            create_rl(rl_name, shader1, shader1, aces_color, clearcoat)
+            # create 2 additional renderlayer for dualtone variants
+            if twotone is True:
+                create_rl(rl_name, shader1, 2, aces_color, clearcoat)
+                create_rl(rl_name, shader1, 3, aces_color, clearcoat)
 
 
-configurator("C:/Users/florianbehr/Documents/_repository/configurator/testconfig.xlsx")
+configurator("C:/Users/florianbehr/Documents/_repository/configurator/G70_Individual_Color_List_0423.xlsx")
