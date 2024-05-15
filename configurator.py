@@ -57,21 +57,25 @@ def read_excel_rows(filepath: str) -> list:
     # return the list
     return rows_as_lists
 
-def create_rl(rl_name: str, shader1: int, shader2: int, color: tuple, clearcoat: bool):
+def create_rl(rl_name: str, base_paint: str, twotone_paint: str, metallic_carpaint: str, solid_carpaint: str, shader_id_1: int, shader_id_2: int, color: tuple, clearcoat: bool):
     '''
     Create renderlayers, collections and overrides based on the arguments.
 
     Args:
         rl_name (str): Name of the renderlayer
-        shader1 (int): Switch shader ID to use
-        shader2 (int): Switch shader ID to use
+        base_paint (str): Name of base paint shader
+        twotone_paint (str): Name of twotone shader
+        metallic_carpaint (str): Name of metallic carpaint shader
+        solid_carpaint (str): Name of solid carpaint shader
+        shader_id_1 (int): Switch shader ID to use
+        shader_id_2 (int): Switch shader ID to use
         color (tuple): color for the override
         clearcoat (bool): Is this a clearcoat or frozen shader
     '''
 
     # set glossiness for override
     if clearcoat is True:
-        coat_glossiness = 0.97
+        coat_glossiness = 0.99
     elif clearcoat is False:
         coat_glossiness = 0.78
 
@@ -100,16 +104,16 @@ def create_rl(rl_name: str, shader1: int, shader2: int, color: tuple, clearcoat:
     switch2_col.getSelector().setFilterType(3)
 
     # add the shader to the collections
-    switch1_col.getSelector().staticSelection.set(["base_paint"])
-    switch2_col.getSelector().staticSelection.set(["twotone_paint"])
+    switch1_col.getSelector().staticSelection.set([base_paint])
+    switch2_col.getSelector().staticSelection.set([twotone_paint])
 
     # create the overrides
-    switch1_override = switch1_col.createAbsoluteOverride("switch001", "materialsSwitch")
-    switch2_override = switch2_col.createAbsoluteOverride("switch002", "materialsSwitch")
+    switch1_override = switch1_col.createAbsoluteOverride(base_paint, "materialsSwitch")
+    switch2_override = switch2_col.createAbsoluteOverride(twotone_paint, "materialsSwitch")
 
     # set the values
-    switch1_override.setAttrValue(shader1)
-    switch2_override.setAttrValue(shader2)
+    switch1_override.setAttrValue(shader_id_1)
+    switch2_override.setAttrValue(shader_id_2)
 
 
     ###################
@@ -124,17 +128,17 @@ def create_rl(rl_name: str, shader1: int, shader2: int, color: tuple, clearcoat:
 
     # add shader to collection and create overrides
     # for metallic carpaints
-    if shader1 == 1:
-        carpaint_col.getSelector().staticSelection.set(["metallic_carpaint"])
-        color_override = carpaint_col.createAbsoluteOverride("carpaint_color_override001", "base_color")
-        clearcoat_override = carpaint_col.createAbsoluteOverride("carpaint_clearcoat_override001", "coat_glossiness")
+    if shader_id_1 == 1:
+        carpaint_col.getSelector().staticSelection.set([metallic_carpaint])
+        color_override = carpaint_col.createAbsoluteOverride(metallic_carpaint, "base_color")
+        clearcoat_override = carpaint_col.createAbsoluteOverride(metallic_carpaint, "coat_glossiness")
         color_override.setAttrValue(color)
         clearcoat_override.setAttrValue(coat_glossiness)
 
     # and for solid carpaints
-    elif shader1 == 0:
-        carpaint_col.getSelector().staticSelection.set(["solid_carpaint"])
-        color_override = carpaint_col.createAbsoluteOverride("carpaint_color_override001", "color")
+    elif shader_id_1 == 0:
+        carpaint_col.getSelector().staticSelection.set([solid_carpaint])
+        color_override = carpaint_col.createAbsoluteOverride(solid_carpaint, "color")
         color_override.setAttrValue(color)
 
 def hex_to_rgb(hex: str) ->tuple:
@@ -180,6 +184,33 @@ def srgb_to_aces(srgb_color: tuple) -> list:
 
     return acescg_color
 
+def get_carpaint_shader():
+
+    base_paint = None
+    twotone_paint = None
+    metallic_carpaint = None
+    solid_carpaint = None
+
+    switch_materials = cmds.ls(type="VRaySwitchMtl") or []
+    carpaint_materials = cmds.ls(type="VRayCarPaint2Mtl") or []
+    vray_materials = cmds.ls(type="VRayMtl")
+
+    for material in switch_materials:
+        if material.endswith("base_paint"):
+            base_paint = material
+        elif material.endswith("twotone_paint"):
+            twotone_paint = material
+
+    for material in carpaint_materials:
+        if material.endswith("metallic_carpaint"):
+            metallic_carpaint = material
+
+    for material in vray_materials:
+        if material.endswith("solid_carpaint"):
+            solid_carpaint = material
+
+    return base_paint, twotone_paint, metallic_carpaint, solid_carpaint
+
 def configurator(filepath: str):
     '''
     Parse the rows of the excel file and create renderlayers based on the info.
@@ -194,40 +225,73 @@ def configurator(filepath: str):
     #   0       1       2       3   4       5       6       7       8
 
     if rows != None:
+        base_paint, twotone_paint, metallic_carpaint, solid_carpaint = get_carpaint_shader()
+
+        if base_paint is None:
+            om.MGlobal.displayInfo("Base paint material not found.")
+            exit()
+        if twotone_paint is None:
+            om.MGlobal.displayInfo("Two tone material not found.")
+            exit()
+        if metallic_carpaint is None:
+            om.MGlobal.displayInfo("Metallic carpaint material not found.")
+            exit()
+        if solid_carpaint is None:
+            om.MGlobal.displayInfo("Solid carpaint material not found.")
+            exit()
+
         # iterate over rows, extract data and call function to create render layer.
         for row in rows:
-            rl_name = row[0]
+            # print(row)
 
-            hex_color = row[3][1:]
+            # convert to title case
+            color_name = row[3].title()
+
+            color_name = color_name.replace("Ii", "II")
+
+            # remove unwanted characters
+            color_name = color_name.replace(" ", "")
+            color_name = color_name.replace(".", "")
+
+            # create renderlayer name
+            rl_name = row[6] + "_" + color_name
+
+            # print(f"Renderlayer name: {rl_name}")
+
+            hex_color = row[5][1:]
             srgb_color = hex_to_rgb(hex_color)
             aces_color = srgb_to_aces(srgb_color)
 
-            if row[5] == "Metallic":
-                shader1 = 1
+            if row[7] == "Metallic":
+                shader_id_1 = 1
                 clearcoat = True
-            elif row[5] == "Uni":
-                shader1 = 0
+            elif row[7] == "Uni":
+                shader_id_1 = 0
                 clearcoat = True
-            elif row[5] == "Frozen":
-                shader1 = 1
+            elif row[7] == "Frozen":
+                shader_id_1 = 1
                 clearcoat = False
             else:
                 om.MGlobal.displayInfo("Could not parse correct Clearcoat info. Please check Excel file.")
                 continue
 
-            if row[7] == "Individual TT":
-                twotone = True
-            elif row[7] == "No":
-                twotone = False
-            else:
-                om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
-                continue
+            # if row[7] == "Individual TT":
+            #     twotone = True
+            # elif row[7] == "No":
+            #     twotone = False
+            # else:
+            #     om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
+            #     continue
 
-            create_rl(rl_name, shader1, shader1, aces_color, clearcoat)
+            create_rl(rl_name, base_paint, twotone_paint, metallic_carpaint, solid_carpaint, shader_id_1, shader_id_1, aces_color, clearcoat)
+
             # create 2 additional renderlayer for dualtone variants
-            if twotone is True:
-                create_rl(rl_name, shader1, 2, aces_color, clearcoat)
-                create_rl(rl_name, shader1, 3, aces_color, clearcoat)
+            # if twotone is True:
+                # create_rl(rl_name, shader_id_1, 2, aces_color, clearcoat)
+                # create_rl(rl_name, shader_id_1, 3, aces_color, clearcoat)
+
+    else:
+        om.MGlobal.displayInfo("Can't read Excel rows.")
 
 
 configurator("C:/Users/florianbehr/Documents/_repository/configurator/G70_Individual_Color_List_0423.xlsx")
