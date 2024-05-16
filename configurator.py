@@ -8,6 +8,8 @@ import maya.app.renderSetup.model.renderSetup as renderSetup
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 
+# TODO: collection for shaders should use wildcards to catch changes in the shader names when updating
+
 '''
     The car has two VRaySwitchMaterials assigned to the correct geo:
     base_paint, twotone_paint.
@@ -252,6 +254,7 @@ def configurator(filepath: str):
             # remove unwanted characters
             color_name = color_name.replace(" ", "")
             color_name = color_name.replace(".", "")
+            color_name = color_name.replace("-", "")
 
             # create renderlayer name
             rl_name = row[6] + "_" + color_name
