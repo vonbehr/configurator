@@ -1,71 +1,62 @@
 import psapi
 import numpy as np
 import cv2
-
-color_mode = psapi.enum.ColorMode.rgb
-width = 4000
-height = 2250
-file = psapi.LayeredFile_8bit(color_mode, width, height)
-print(type(file))
-
-# CV2 reads images in packed BGR order by default, we now need to go from packed to planar
-# e.g. from BGR BGR BGR BGR -> RRRR BBBB GGGG
-image = cv2.imread("C:/Users/florianbehr/Desktop/configurator/white_BrilliantWhiteMetallic.png", cv2.IMREAD_UNCHANGED)
-
-print(type(image))
-
-transformed_image = np.zeros((image.shape[2], image.shape[0], image.shape[1]), np.uint8)
-transformed_image[0] = image[:, :, 2]   # Use numpy slicing to get the third channel of bgr
-transformed_image[1] = image[:, :, 1]
-transformed_image[2] = image[:, :, 0]
-transformed_image[3] = image[:, :, 3]
-
-print(type(transformed_image))
-
-# Construct our layer instance, width and height must be specified for this to work!
-img_lr = psapi.ImageLayer_8bit(
-        transformed_image,
-        layer_name="layer 001",
-        width=width,
-        height=height,
-        color_mode=color_mode)
-
-# Add to the file and write out
-# file.add_layer(img_lr)
-# file.write("C:/Users/florianbehr/Desktop/configurator/Out.psd")
+import os
+from OpenImageIO import ImageBuf, ImageBufAlgo
 
 
-def convert_exr(self, image_file: str, extension: str) -> str:
+
+def convert_exr(image_file: str) -> str:
     """
-    Convert exr files to another format
+    Convert exr files to png
 
     Args:
         image_file (str): image file + path to convert
-        extension (str): extension of the converted file
 
     Returns:
         string: filepath of the converted image
     """
 
-    # We assume image_file is an exr in linear colorspace.
+    # We assume image_file is an exr in ACEScg colorspace.
     path, filename = os.path.split(image_file)
     file, ext = os.path.splitext(filename)
-    converted_file = self.output_dir + "/images/" + file + "." + extension
+    converted_file = path + "/" + file + ".png"
 
     # read image
     inbuffer = ImageBuf(image_file)
 
     # copy only RGB
     outbuffer = ImageBuf()
-    ImageBufAlgo.channels(outbuffer, inbuffer, ("R", "G", "B"))
+    ImageBufAlgo.channels(outbuffer, inbuffer, ("R", "G", "B", "A"))
 
-    # convert from linear to sRGB
+    # convert from ACEScg to sRGB
     dst = ImageBufAlgo.colorconvert(outbuffer, "ACES - ACEScg", "out_srgb")
 
     # write image in 8 Bit
     dst.write(converted_file, "uint8")
 
     return converted_file
+
+def get_images_from_folder(path: str, extension: str) -> list:
+    '''
+    Parse a dir and all subfolders and add all files with the specified extension to a list.
+
+    Args:
+        path (str): Start path for parsing
+        extension (str): Extension of files to add to list
+
+    Returns:
+        list: List of filepaths
+    '''
+
+    files_found = []
+
+    for dirpath, subdirs, files in os.walk(path):
+        for i in files:
+            if i.endswith("." + extension):
+                files_found.append(os.path.join(dirpath, i))
+
+    return files_found
 
 def load_image(filepath: str) -> np.ndarray:
     '''
@@ -90,7 +81,7 @@ def load_image(filepath: str) -> np.ndarray:
 
     return transformed_image
 
-def create_ps(width: int, height: int, color_mode: str, bitdepth: int):
+def create_ps_file(width: int, height: int, color_mode: str, bitdepth: int):
     '''
     Create a layered Photoshop file object
 
@@ -113,16 +104,15 @@ def create_ps(width: int, height: int, color_mode: str, bitdepth: int):
 
     return ps_document
 
-def create_layer(width: int, height: int, color_mode: str, bitdepth: int, name: str):
+def create_layer(image, width: int, height: int, color_mode: str, bitdepth: int, name: str):
 
     # Construct our layer instance, width and height must be specified for this to work!
-
     if bitdepth is 8:
-        layer = psapi.ImageLayer_8bit(transformed_image, layer_name=name, width=width, height=height, color_mode=color_mode)
+        layer = psapi.ImageLayer_8bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
     elif bitdepth is 16:
-        layer = psapi.ImageLayer_16bit(transformed_image, layer_name=name, width=width, height=height, color_mode=color_mode)
+        layer = psapi.ImageLayer_16bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
     elif bitdepth is 32:
-        layer = psapi.ImageLayer_32bit(transformed_image, layer_name=name, width=width, height=height, color_mode=color_mode)
+        layer = psapi.ImageLayer_32bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
 
     return layer
 
