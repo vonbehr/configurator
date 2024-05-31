@@ -63,7 +63,7 @@ def load_image(filepath: str) -> np.ndarray:
     Read an image from the filepath and return it in the correct format for PhotoshopAPI.
 
     Args:
-        filepath (str): PAth to the file
+        filepath (str): Path to the file
 
     Returns:
         np.ndarray: ndarray in the correct format for PhotoshopAPI
@@ -92,7 +92,7 @@ def create_ps_file(width: int, height: int, color_mode: str, bitdepth: int):
         bitdepth (int): color depth, can be 8, 16 or 32
 
     Returns:
-        psapi.LayeredFile_Nbit: layered Photoshop file object
+        psapi.LayeredFile_*N*bit: layered Photoshop file object
     '''
 
     if bitdepth is 8:
@@ -105,6 +105,20 @@ def create_ps_file(width: int, height: int, color_mode: str, bitdepth: int):
     return ps_document
 
 def create_layer(image, width: int, height: int, color_mode: str, bitdepth: int, name: str):
+    '''
+    Create a Photoshop layer object.
+
+    Args:
+        image (np.ndarray): Image object
+        width (int): image width
+        height (int): image height
+        color_mode (str): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
+        bitdepth (int): color depth, can be 8, 16 or 32
+        name (str): layer name
+
+    Returns:
+        psapi.Layer_*N*bit: layer object
+    '''
 
     # Construct our layer instance, width and height must be specified for this to work!
     if bitdepth is 8:
@@ -116,20 +130,39 @@ def create_layer(image, width: int, height: int, color_mode: str, bitdepth: int,
 
     return layer
 
-def create_layer_group(name):
-    pass
-    # create a ps layer group
-    return layer_group
+def create_group_layer(width: int, height: int, color_mode: str, bitdepth: int, name: str):
+    '''
+    Create a group layer object.
 
-def add_layer_to_group(layer, group):
-    pass
+    Args:
+        width (int): image width
+        height (int): image height
+        color_mode (str): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
+        bitdepth (int): color depth, can be 8, 16 or 32
+        name (str): group layer name
+
+    Returns:
+        psapi.GroupLayer_*N*bit: group layer object
+    '''
+    # Construct our layer instance, width and height must be specified for this to work!
+    if bitdepth is 8:
+        group_layer = psapi.GroupLayer_8bit(layer_name=name, width=width, height=height, color_mode=color_mode)
+    elif bitdepth is 16:
+        group_layer = psapi.GroupLayer_16bit(layer_name=name, width=width, height=height, color_mode=color_mode)
+    elif bitdepth is 32:
+        group_layer = psapi.GroupLayer_32bit(layer_name=name, width=width, height=height, color_mode=color_mode)
+
+    return group_layer
+
+def add_layer_to_group(ps_document, layer, group_layer):
     # add a ps layer to a layer group
+    group_layer.add_layer(ps_document, layer)
 
 def add_layer_to_document(layer, ps_document):
-    file.add_layer(ps_document)
+    # layer can be group layer or image layer
+    ps_document.add_layer(layer)
 
 def save_ps(ps_document, filepath):
-    pass
     # save a ps file to disc
     ps_document.write(filepath)
 
