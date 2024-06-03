@@ -3,7 +3,9 @@ import psapi
 import numpy as np
 import cv2
 import os
+import OpenImageIO as oiio
 from OpenImageIO import ImageBuf, ImageBufAlgo
+import re
 
 
 
@@ -214,15 +216,81 @@ def create_group_layer(width: int, height: int, color_mode: str, bitdepth: int, 
 
     return group_layer
 
-def add_layer_to_group(ps_document, layer, group_layer):
+def add_layer_to_group(ps_document: psapi.LayeredFile_8bit, layer: psapi.Layer_8bit, group_layer: psapi.GroupLayer_8bit):
     # add a ps layer to a layer group
     group_layer.add_layer(ps_document, layer)
 
-def add_layer_to_document(layer, ps_document):
+def add_layer_to_document(ps_document: psapi.LayeredFile_8bit, layer: psapi.Layer_8bit):
     # layer can be group layer or image layer
     ps_document.add_layer(layer)
 
-def save_ps(ps_document, filepath):
+def save_ps(ps_document: psapi.LayeredFile_8bit, filepath: str):
     # save a ps file to disc
     ps_document.write(filepath)
+
+def get_size(filepath:str) -> int:
+    '''
+    Get the pixel resolution of a given image file
+
+    Args:
+        filepath (str): Filepath of the file
+
+    Returns:
+        int: Pixel dimensions in X and Y
+    '''
+
+    inbuffer = oiio.ImageInput.open(filepath)
+
+    if inbuffer :
+        spec = inbuffer.spec()
+        width = spec.width
+        height = spec.height
+        inbuffer.close()
+
+        return width, height
+
+def ingest(filepath: str):
+
+    colormode = "psapi.enum.ColorMode.rgb"
+
+    # get exr files from folder
+    exr_files = get_images_from_folder(filepath, "exr") or []
+
+    # get the pixel dimensions from the first exr file. We assume all files have the same size.
+    width, height = get_size(exr_files[0])
+
+    # create a Photoshop doc
+    ps_document = create_ps_file(width, height, 8)
+
+    # create a list of needed group layers
+    group_layer_names = []
+    for file in exr_files:
+        group_name, layer_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))
+        group_layer_names.append(group_name)
+
+        # convert to set to get rid of dupes
+        group_layer_names = set(group_layer_names)
+
+    # create needed layer groups and add them to sict
+    group_layer_dict = {}
+    for layer in group_layer_names:
+        group_layer = create_group_layer(width, height, colormode, 8, layer)
+
+        group_layer_dict.update({layer: group_layer})
+
+    for file in exr_files:
+        # just the filename from the exr file
+        filename = os.path.basename(file)
+
+        group_name, layer_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))
+
+        # create a layer object
+        layer = create_layer(width, height, colormode, 8, layer_name)
+
+        # add layer object to top level
+        # add_layer_to_document(ps_document, layer)
+
+        add_layer_to_group(ps_document, layer, group_layer_dict[group_name])
+
+
 
