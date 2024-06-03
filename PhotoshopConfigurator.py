@@ -1,3 +1,4 @@
+from matplotlib.mlab import psd
 import psapi
 import numpy as np
 import cv2
@@ -68,7 +69,7 @@ def load_image(filepath: str) -> np.ndarray:
     Returns:
         np.ndarray: ndarray in the correct format for PhotoshopAPI
     '''
-    # read image with alpha channel
+    # read image with alpha channel, returns np.array
     image = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
 
     # CV2 reads images in packed BGR order by default, we now need to go from packed to planar
@@ -80,6 +81,54 @@ def load_image(filepath: str) -> np.ndarray:
     transformed_image[3] = image[:, :, 3]
 
     return transformed_image
+
+def export_layers(filepath: str, out_path: str):
+    '''
+    Parse Phgotoshop file for image layers and call function to write them to disc.
+
+    Args:
+        filepath (str): Filepath to Photoshop file
+        out_path (str): Output path
+    '''
+
+    # read PS document
+    ps_document = psapi.LayeredFile.read(filepath)
+
+    # iterate over top level layers in PS file
+    for layer in ps_document.layers:
+
+        # if layer is group layer, look for image layers beneath it
+        if isinstance(layer, psapi.GroupLayer_8bit):
+            for sub_layer in layer.layers:
+                if isinstance(sub_layer, psapi.ImageLayer_8bit):
+                    write_layer(sub_layer, out_path)
+
+        # if layer is image layer
+        elif isinstance(layer, psapi.ImageLayer_8bit):
+            write_layer(layer, out_path)
+
+def write_layer(layer: psapi.ImageLayer_8bit, out_path: str):
+    '''
+    Write a given Photoshop layer to disc.
+
+    Args:
+        layer (psapi.ImageLayer_8bit): Photoshop layer object
+        out_path (str): Path where image is written
+    '''
+    # get name of layer for filename
+    name = layer.name
+
+    # shuffle dict to get the right order for cv2
+    R = layer.image_data[0]
+    G = layer.image_data[1]
+    B = layer.image_data[2]
+    A = layer.image_data[-1]
+
+    # pack array for right order
+    packed_array = np.dstack((B, G, R, A))
+
+    cv2.imwrite(out_path + "/" + name + ".png", packed_array)
+
 
 def create_ps_file(width: int, height: int, color_mode: str, bitdepth: int):
     '''
@@ -103,6 +152,17 @@ def create_ps_file(width: int, height: int, color_mode: str, bitdepth: int):
         ps_document = psapi.LayeredFile_32bit(color_mode, width, height)
 
     return ps_document
+
+def read_ps_file(filepath):
+
+    ps_document = psapi.LayeredFile.read(filepath)
+
+
+    width = ps_document.width
+    height = ps_document.height
+    bit_depth: psapi.enum.BitDepth = psapi.PhotoshopFile.find_bitdepth(filepath)
+
+    return ps_document, bit_depth
 
 def create_layer(image, width: int, height: int, color_mode: str, bitdepth: int, name: str):
     '''
