@@ -132,25 +132,25 @@ def write_layer(layer: psapi.ImageLayer_8bit, out_path: str):
     cv2.imwrite(out_path + "/" + name + ".png", packed_array)
 
 
-def create_ps_file(width: int, height: int, color_mode: str, bitdepth: int):
+def create_ps_file(width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int):
     '''
     Create a layered Photoshop file object
 
     Args:
         width (int): Width in pixel
         height (int): Height in pixel
-        color_mode (str): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
+        color_mode (psapi.enum.ColorMode): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
         bitdepth (int): color depth, can be 8, 16 or 32
 
     Returns:
         psapi.LayeredFile_*N*bit: layered Photoshop file object
     '''
 
-    if bitdepth is 8:
+    if bitdepth == 8:
         ps_document = psapi.LayeredFile_8bit(color_mode, width, height)
-    elif bitdepth is 16:
+    elif bitdepth == 16:
         ps_document = psapi.LayeredFile_16bit(color_mode, width, height)
-    elif bitdepth is 32:
+    elif bitdepth == 32:
         ps_document = psapi.LayeredFile_32bit(color_mode, width, height)
 
     return ps_document
@@ -166,7 +166,7 @@ def read_ps_file(filepath):
 
     return ps_document, bit_depth
 
-def create_layer(image, width: int, height: int, color_mode: str, bitdepth: int, name: str):
+def create_layer(image, width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str):
     '''
     Create a Photoshop layer object.
 
@@ -174,7 +174,7 @@ def create_layer(image, width: int, height: int, color_mode: str, bitdepth: int,
         image (np.ndarray): Image object
         width (int): image width
         height (int): image height
-        color_mode (str): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
+        color_mode (psapi.enum.ColorMode): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
         bitdepth (int): color depth, can be 8, 16 or 32
         name (str): layer name
 
@@ -183,23 +183,23 @@ def create_layer(image, width: int, height: int, color_mode: str, bitdepth: int,
     '''
 
     # Construct our layer instance, width and height must be specified for this to work!
-    if bitdepth is 8:
+    if bitdepth == 8:
         layer = psapi.ImageLayer_8bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
-    elif bitdepth is 16:
+    elif bitdepth == 16:
         layer = psapi.ImageLayer_16bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
-    elif bitdepth is 32:
+    elif bitdepth == 32:
         layer = psapi.ImageLayer_32bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
 
     return layer
 
-def create_group_layer(width: int, height: int, color_mode: str, bitdepth: int, name: str):
+def create_group_layer(width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str):
     '''
     Create a group layer object.
 
     Args:
         width (int): image width
         height (int): image height
-        color_mode (str): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
+        color_mode (psapi.enum.ColorMode): Colormode, usually RGB or CMYK e.g. psapi.enum.ColorMode.rgb
         bitdepth (int): color depth, can be 8, 16 or 32
         name (str): group layer name
 
@@ -207,11 +207,11 @@ def create_group_layer(width: int, height: int, color_mode: str, bitdepth: int, 
         psapi.GroupLayer_*N*bit: group layer object
     '''
     # Construct our layer instance, width and height must be specified for this to work!
-    if bitdepth is 8:
+    if bitdepth == 8:
         group_layer = psapi.GroupLayer_8bit(layer_name=name, width=width, height=height, color_mode=color_mode)
-    elif bitdepth is 16:
+    elif bitdepth == 16:
         group_layer = psapi.GroupLayer_16bit(layer_name=name, width=width, height=height, color_mode=color_mode)
-    elif bitdepth is 32:
+    elif bitdepth == 32:
         group_layer = psapi.GroupLayer_32bit(layer_name=name, width=width, height=height, color_mode=color_mode)
 
     return group_layer
@@ -250,8 +250,11 @@ def get_size(filepath:str) -> int:
         return width, height
 
 def ingest(filepath: str):
+    # set env var for color conversion
+    os.environ["OCIO"] = "Z:/OCIO/aces_1.2/config.ocio"
 
-    colormode = "psapi.enum.ColorMode.rgb"
+    # colormode of the ps doc
+    colormode = psapi.enum.ColorMode.rgb
 
     # get exr files from folder
     exr_files = get_images_from_folder(filepath, "exr") or []
@@ -259,38 +262,52 @@ def ingest(filepath: str):
     # get the pixel dimensions from the first exr file. We assume all files have the same size.
     width, height = get_size(exr_files[0])
 
-    # create a Photoshop doc
-    ps_document = create_ps_file(width, height, 8)
+    # create a Photoshop doc with the right colormode and dimensions
+    ps_document = create_ps_file(width, height, colormode, 8)
 
     # create a list of needed group layers
     group_layer_names = []
+
     for file in exr_files:
-        group_name, layer_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))
+        filename = os.path.basename(file)
+        group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
         group_layer_names.append(group_name)
 
-        # convert to set to get rid of dupes
-        group_layer_names = set(group_layer_names)
+    # convert to a set to get rid of duplicates
+    group_layer_names = set(group_layer_names)
 
-    # create needed layer groups and add them to sict
+    # create needed layer groups and add them to dict
     group_layer_dict = {}
-    for layer in group_layer_names:
-        group_layer = create_group_layer(width, height, colormode, 8, layer)
+    for name in group_layer_names:
+        group_layer = create_group_layer(width, height, colormode, 8, name)
 
-        group_layer_dict.update({layer: group_layer})
+        # add group layer to ps doc
+        add_layer_to_document(ps_document, group_layer)
 
+        # add name and group layer object to dict
+        group_layer_dict.update({name: group_layer})
+
+    # convert exr files from ACEScg to sRGB in PNG and add them to the PS doc
     for file in exr_files:
         # just the filename from the exr file
         filename = os.path.basename(file)
 
-        group_name, layer_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))
+        # get layer and group name
+        layer_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
+        group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
+
+        # convert exr file
+        png_image = convert_exr(file)
 
         # create a layer object
-        layer = create_layer(width, height, colormode, 8, layer_name)
+        layer_image = load_image(png_image)
+        layer = create_layer(layer_image, width, height, colormode, 8, layer_name)
 
-        # add layer object to top level
         # add_layer_to_document(ps_document, layer)
-
         add_layer_to_group(ps_document, layer, group_layer_dict[group_name])
 
 
+    save_ps(ps_document, "C:/Users/florianbehr/Desktop/configurator/BMW_config.psd")
+
+ingest("C:/Users/florianbehr/Desktop/configurator/renders")
 
