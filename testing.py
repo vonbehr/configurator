@@ -1,7 +1,15 @@
-import re
+import psapi
 
-filename = "24028_BMWi7Config01_renderRenderBlack_FrozenBlackMetallic_v002.exr"
+ps_document =  psapi.LayeredFile.read("C:/Users/florianbehr/Desktop/configurator/BMW_config.psd")
 
-group_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
+layers = ps_document.layers
 
-print(group_name)
+for layer in layers:
+    if type(layer) == psapi.GroupLayer_8bit:
+        print(f"Group Layer: {layer.name}")
+        group_layers = layer.layers or []
+        for gl in group_layers:
+            print(f"Layer name: {gl.name}")
+
+    else:
+        print(f"Layer name: {layer.name}")

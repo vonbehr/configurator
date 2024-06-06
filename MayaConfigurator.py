@@ -244,7 +244,6 @@ def configurator(filepath: str):
 
         # iterate over rows, extract data and call function to create render layer.
         for row in rows:
-            # print(row)
 
             # convert to title case
             color_name = row[3].title()
@@ -259,7 +258,7 @@ def configurator(filepath: str):
             # create renderlayer name
             rl_name = row[6] + "_" + color_name
 
-            # print(f"Renderlayer name: {rl_name}")
+            print(f"Renderlayer name: {rl_name}")
 
             hex_color = row[5][1:]
             srgb_color = hex_to_rgb(hex_color)

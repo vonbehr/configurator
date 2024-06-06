@@ -164,7 +164,7 @@ def read_ps_file(filepath):
     height = ps_document.height
     bit_depth: psapi.enum.BitDepth = psapi.PhotoshopFile.find_bitdepth(filepath)
 
-    return ps_document, bit_depth
+    return ps_document, width, height, bit_depth
 
 def create_layer(image, width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str):
     '''
@@ -292,6 +292,8 @@ def ingest(filepath: str):
         # just the filename from the exr file
         filename = os.path.basename(file)
 
+        print(f"Processing {filename}")
+
         # get layer and group name
         layer_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
         group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
@@ -310,4 +312,3 @@ def ingest(filepath: str):
     save_ps(ps_document, "C:/Users/florianbehr/Desktop/configurator/BMW_config.psd")
 
 ingest("C:/Users/florianbehr/Desktop/configurator/renders")
-
