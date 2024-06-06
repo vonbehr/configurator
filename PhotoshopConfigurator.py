@@ -270,11 +270,24 @@ def ingest(filepath: str):
 
     for file in exr_files:
         filename = os.path.basename(file)
-        group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
+
+        if "renderRenderCar" in filename:
+            car_group_name = "Car"
+
+        elif "TwoTone" in filename:
+            twotone_group_name = "Two Tone"
+
+        else:
+            group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
+
         group_layer_names.append(group_name)
 
-    # convert to a set to get rid of duplicates
-    group_layer_names = set(group_layer_names)
+    # convert to a set, back to a list and sort it to get rid of duplicates
+    group_layer_names = sorted(list(set(group_layer_names)))
+
+    # add base car and two tone groups. Car group will be at the bottom, two tone at the top
+    group_layer_names.insert(0, twotone_group_name)
+    group_layer_names.append(car_group_name)
 
     # create needed layer groups and add them to dict
     group_layer_dict = {}
@@ -295,8 +308,21 @@ def ingest(filepath: str):
         print(f"Processing {filename}")
 
         # get layer and group name
-        layer_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
-        group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
+        if "renderRenderCar" in filename:
+            layer_name = "Base Car"
+            group_name = "Car"
+
+        elif "TwoToneBlack" in filename:
+            layer_name = "Two Tone Black"
+            group_name = "Two Tone"
+
+        elif "TwoToneGray" in filename:
+            layer_name = "Two Tone Gray"
+            group_name = "Two Tone"
+
+        else:
+            layer_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
+            group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
 
         # convert exr file
         png_image = convert_exr(file)
