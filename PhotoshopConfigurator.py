@@ -1,3 +1,4 @@
+from colour import write_image
 from matplotlib.mlab import psd
 import psapi
 import numpy as np
@@ -337,4 +338,65 @@ def ingest(filepath: str):
 
     save_ps(ps_document, "C:/Users/florianbehr/Desktop/configurator/BMW_config.psd")
 
-ingest("C:/Users/florianbehr/Desktop/configurator/renders")
+def compose(filepath):
+    # set env var for color conversion
+    os.environ["OCIO"] = "Z:/OCIO/aces_1.2/config.ocio"
+
+    # get exr files from folder
+    exr_files = get_images_from_folder(filepath, "exr") or []
+
+    carpaint_renders = []
+
+    for file in exr_files:
+        filename = os.path.basename(file)
+
+        if "renderRenderCar" in filename:
+            car_render = file
+
+        elif "TwoToneBlack" in filename:
+            twotoneblack_render = file
+
+        elif "TwoToneGray" in filename:
+            twotonegray_render = file
+
+        else:
+            carpaint_renders.append(file)
+
+    car_buf = ImageBuf(car_render)
+    twotoneblack_buf = ImageBuf(twotoneblack_render)
+    twotonegray_buf = ImageBuf(twotonegray_render)
+
+
+    for file in carpaint_renders:
+        # just the filename from the exr file
+        filename = os.path.basename(file)
+
+        print(f"Processing {filename}")
+
+        # get layer and group name
+        if "renderRenderCar" in filename:
+            continue
+
+        elif "TwoTone" in filename:
+            continue
+
+        elif "TwoToneGray" in filename:
+            continue
+
+        else:
+            color_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
+            colorgroup_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
+            carpaint_buf = ImageBuf(file)
+
+            comp1_buf = ImageBufAlgo.over(carpaint_buf, car_buf)
+            comp2_buf = ImageBufAlgo.over(twotonegray_buf, comp1_buf)
+
+            # convert from ACEScg to sRGB
+            out_buf = ImageBufAlgo.colorconvert(comp2_buf, "ACES - ACEScg", "out_srgb")
+
+            # write image in 8 Bit
+            out_buf.write("C:/Users/florianbehr/Desktop/configurator/output/" + colorgroup_name + "_" + color_name + ".png", "uint8")
+
+
+# ingest("C:/Users/florianbehr/Desktop/configurator/renders")
+compose("C:/Users/florianbehr/Desktop/configurator/renders")
