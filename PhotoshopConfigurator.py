@@ -1,5 +1,3 @@
-from colour import write_image
-from matplotlib.mlab import psd
 import psapi
 import numpy as np
 import cv2
@@ -7,7 +5,6 @@ import os
 import OpenImageIO as oiio
 from OpenImageIO import ImageBuf, ImageBufAlgo
 import re
-
 
 
 def convert_exr(image_file: str) -> str:
@@ -41,6 +38,7 @@ def convert_exr(image_file: str) -> str:
 
     return converted_file
 
+
 def get_images_from_folder(path: str, extension: str) -> list:
     '''
     Parse a dir and all subfolders and add all files with the specified extension to a list.
@@ -61,6 +59,7 @@ def get_images_from_folder(path: str, extension: str) -> list:
                 files_found.append(os.path.join(dirpath, i))
 
     return files_found
+
 
 def load_image(filepath: str) -> np.ndarray:
     '''
@@ -84,6 +83,7 @@ def load_image(filepath: str) -> np.ndarray:
     transformed_image[3] = image[:, :, 3]
 
     return transformed_image
+
 
 def export_layers(filepath: str, out_path: str):
     '''
@@ -109,6 +109,7 @@ def export_layers(filepath: str, out_path: str):
         # if layer is image layer
         elif isinstance(layer, psapi.ImageLayer_8bit):
             write_layer(layer, out_path)
+
 
 def write_layer(layer: psapi.ImageLayer_8bit, out_path: str):
     '''
@@ -156,16 +157,17 @@ def create_ps_file(width: int, height: int, color_mode: psapi.enum.ColorMode, bi
 
     return ps_document
 
+
 def read_ps_file(filepath):
 
     ps_document = psapi.LayeredFile.read(filepath)
-
 
     width = ps_document.width
     height = ps_document.height
     bit_depth: psapi.enum.BitDepth = psapi.PhotoshopFile.find_bitdepth(filepath)
 
     return ps_document, width, height, bit_depth
+
 
 def create_layer(image, width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str):
     '''
@@ -193,6 +195,7 @@ def create_layer(image, width: int, height: int, color_mode: psapi.enum.ColorMod
 
     return layer
 
+
 def create_group_layer(width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str):
     '''
     Create a group layer object.
@@ -217,17 +220,21 @@ def create_group_layer(width: int, height: int, color_mode: psapi.enum.ColorMode
 
     return group_layer
 
+
 def add_layer_to_group(ps_document: psapi.LayeredFile_8bit, layer: psapi.Layer_8bit, group_layer: psapi.GroupLayer_8bit):
     # add a ps layer to a layer group
     group_layer.add_layer(ps_document, layer)
+
 
 def add_layer_to_document(ps_document: psapi.LayeredFile_8bit, layer: psapi.Layer_8bit):
     # layer can be group layer or image layer
     ps_document.add_layer(layer)
 
+
 def save_ps(ps_document: psapi.LayeredFile_8bit, filepath: str):
     # save a ps file to disc
     ps_document.write(filepath)
+
 
 def get_size(filepath:str) -> int:
     '''
@@ -242,13 +249,14 @@ def get_size(filepath:str) -> int:
 
     inbuffer = oiio.ImageInput.open(filepath)
 
-    if inbuffer :
+    if inbuffer:
         spec = inbuffer.spec()
         width = spec.width
         height = spec.height
         inbuffer.close()
 
         return width, height
+
 
 def ingest(filepath: str):
     # set env var for color conversion
@@ -335,8 +343,8 @@ def ingest(filepath: str):
         # add_layer_to_document(ps_document, layer)
         add_layer_to_group(ps_document, layer, group_layer_dict[group_name])
 
-
     save_ps(ps_document, "C:/Users/florianbehr/Desktop/configurator/BMW_config.psd")
+
 
 def compose(filepath):
     # set env var for color conversion
@@ -365,7 +373,6 @@ def compose(filepath):
     car_buf = ImageBuf(car_render)
     twotoneblack_buf = ImageBuf(twotoneblack_render)
     twotonegray_buf = ImageBuf(twotonegray_render)
-
 
     for file in carpaint_renders:
         # just the filename from the exr file
@@ -398,5 +405,5 @@ def compose(filepath):
             out_buf.write("C:/Users/florianbehr/Desktop/configurator/output/" + colorgroup_name + "_" + color_name + ".png", "uint8")
 
 
-# ingest("C:/Users/florianbehr/Desktop/configurator/renders")
-compose("C:/Users/florianbehr/Desktop/configurator/renders")
+ingest("C:/Users/florianbehr/Desktop/configurator/renders")
+# compose("C:/Users/florianbehr/Desktop/configurator/renders")
