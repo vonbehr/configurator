@@ -1,14 +1,12 @@
 import pandas as pd
-from colormath.color_objects import sRGBColor
 import colormath
-import math
 import colour
 import numpy
 import maya.app.renderSetup.model.renderSetup as renderSetup
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 
-# TODO: collection for shaders should use wildcards to catch changes in the shader names when updating
+
 
 '''
     The car has two VRaySwitchMaterials assigned to the correct geo:
@@ -58,6 +56,7 @@ def read_excel_rows(filepath: str) -> list:
 
     # return the list
     return rows_as_lists
+
 
 def create_rl(rl_name: str, base_paint: str, twotone_paint: str, metallic_carpaint: str, solid_carpaint: str, shader_id_1: int, shader_id_2: int, color: tuple, clearcoat: bool):
     '''
@@ -117,7 +116,6 @@ def create_rl(rl_name: str, base_paint: str, twotone_paint: str, metallic_carpai
     switch1_override.setAttrValue(shader_id_1)
     switch2_override.setAttrValue(shader_id_2)
 
-
     ###################
     # Carpaint shader #
     ###################
@@ -143,6 +141,7 @@ def create_rl(rl_name: str, base_paint: str, twotone_paint: str, metallic_carpai
         color_override = carpaint_col.createAbsoluteOverride(solid_carpaint, "color")
         color_override.setAttrValue(color)
 
+
 def hex_to_rgb(hex: str) ->tuple:
     '''
     Convert a hex color into an RGB tuple. RGB value has a range of 0 - 1.
@@ -156,6 +155,7 @@ def hex_to_rgb(hex: str) ->tuple:
     srgb_obj = colormath.color_objects.sRGBColor.new_from_rgb_hex(hex)
 
     return colormath.color_objects.sRGBColor.get_value_tuple(srgb_obj)
+
 
 def srgb_to_aces(srgb_color: tuple) -> list:
     '''
@@ -186,6 +186,7 @@ def srgb_to_aces(srgb_color: tuple) -> list:
 
     return acescg_color
 
+
 def get_carpaint_shader():
 
     base_paint = None
@@ -212,6 +213,7 @@ def get_carpaint_shader():
             solid_carpaint = material
 
     return base_paint, twotone_paint, metallic_carpaint, solid_carpaint
+
 
 def configurator(filepath: str):
     '''
@@ -277,23 +279,10 @@ def configurator(filepath: str):
                 om.MGlobal.displayInfo("Could not parse correct Clearcoat info. Please check Excel file.")
                 continue
 
-            # if row[7] == "Individual TT":
-            #     twotone = True
-            # elif row[7] == "No":
-            #     twotone = False
-            # else:
-            #     om.MGlobal.displayInfo("Could not parse correct tow tone info. Please check Excel file.")
-            #     continue
-
             create_rl(rl_name, base_paint, twotone_paint, metallic_carpaint, solid_carpaint, shader_id_1, shader_id_1, aces_color, clearcoat)
-
-            # create 2 additional renderlayer for dualtone variants
-            # if twotone is True:
-                # create_rl(rl_name, shader_id_1, 2, aces_color, clearcoat)
-                # create_rl(rl_name, shader_id_1, 3, aces_color, clearcoat)
 
     else:
         om.MGlobal.displayInfo("Can't read Excel rows.")
 
 
-configurator("C:/Users/florianbehr/Documents/_repository/configurator/G70_Individual_Color_List_0423.xlsx")
+configurator["PATH/TO/EXCELFILE.xlsx"]
