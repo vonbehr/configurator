@@ -56,7 +56,7 @@ Once the render layers have been rendered out to `.exr` (one file per color/pass
   2. Derives group names from the filenames (one group per render pass, plus a `Car` base group and a `Two Tone` group) via regex.
   3. Creates an 8-bit RGB layered Photoshop document sized to match the renders, with one group layer per pass (base car layer at the bottom, two-tone layer on top).
   4. For every `.exr`: converts ACEScg → sRGB and re-encodes to 8-bit PNG (`convert_exr`, via OpenImageIO), loads it into the packed/planar array layout `psapi` expects (`load_image`), wraps it in an image layer, and inserts it into the matching group.
-  5. Saves the assembled file (hardcoded to `.../configurator/BMW_config.psd`).
+  5. Saves the assembled file.
 - **`compose(folder)`** — an alternative, simpler path that flattens each carpaint render over the base car and the two-tone-gray pass using `ImageBufAlgo.over`, converts to sRGB, and writes one flat PNG per color directly to disk (no Photoshop file involved).
 
 `testing.py` just re-opens a generated `.psd` and prints its group/layer names, to sanity check the output of `ingest()`.
@@ -64,7 +64,7 @@ Once the render layers have been rendered out to `.exr` (one file per color/pass
 ## Requirements
 
 - **Maya stage**: Autodesk Maya with V-Ray, run inside Maya's Python interpreter (`maya.cmds`, `maya.api.OpenMaya`, `maya.app.renderSetup`), plus `pandas`, `colormath`, `colour`, `numpy`.
-- **Photoshop stage**: a standalone Python 3.10 environment (this repo ships one under `Scripts/`/`Lib/`) with `psapi` — the Python bindings for [PhotoshopAPI](https://github.com/EmilDohne/PhotoshopAPI), a third-party (non-Adobe) C++ library for reading/writing `.psd`/`.psb` files — plus `OpenImageIO`, `opencv-python` (`cv2`), `numpy`. **Adobe Photoshop does not need to be installed** — `psapi` reads/writes the `.psd`/`.psb` file format directly, independent of the Photoshop application.
+- **Photoshop stage**: a standalone Python 3.10 environment (this repo ships one under `Scripts/`/`Lib/`) with `psapi` — the Python bindings for [PhotoshopAPI](https://github.com/EmilDohne/PhotoshopAPI), a third-party (non-Adobe) C++ library with python bindings for reading/writing `.psd`/`.psb` files — plus `OpenImageIO`, `opencv-python` (`cv2`), `numpy`. **Adobe Photoshop does not need to be installed** — `psapi` reads/writes the `.psd`/`.psb` file format directly, independent of the Photoshop application.
 - An OCIO config for ACES 1.2 color management (path is currently hardcoded to `Z:/OCIO/aces_1.2/config.ocio`).
 
 ## Usage
@@ -85,6 +85,4 @@ ingest("path/to/rendered/exr/folder")
 
 ## Notes / known limitations
 
-- Several filesystem paths (OCIO config, output `.psd`/`.png` locations) are hardcoded to a specific user's machine and need to be adjusted before running elsewhere.
 - The scripts assume fixed naming conventions for both the Maya shaders (`base_paint`, `twotone_paint`, `metallic_carpaint`, `solid_carpaint`) and the rendered `.exr` filenames (`renderRenderCar`, `TwoToneBlack`, `TwoToneGray`, `renderRender<Pass>_<Color>_...`) — scenes/renders that deviate from these will need script changes.
-- The repository also contains a full Python 3.10 virtual environment (`Lib/`, `Scripts/`, `Include/`, `share/`) checked into git; the actual source lives at the repo root (`MayaConfigurator.py`, `PhotoshopConfigurator.py`, `testing.py`).
