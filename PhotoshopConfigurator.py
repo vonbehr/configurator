@@ -1,10 +1,17 @@
-import psapi
-import numpy as np
-import cv2
 import os
-import OpenImageIO as oiio
-from OpenImageIO import ImageBuf, ImageBufAlgo
 import re
+from typing import List, Optional, Tuple, Union
+
+import cv2
+import numpy as np
+import OpenImageIO as oiio
+import psapi
+from OpenImageIO import ImageBuf, ImageBufAlgo
+
+
+LayeredFile = Union[psapi.LayeredFile_8bit, psapi.LayeredFile_16bit, psapi.LayeredFile_32bit]
+Layer = Union[psapi.Layer_8bit, psapi.Layer_16bit, psapi.Layer_32bit]
+GroupLayer = Union[psapi.GroupLayer_8bit, psapi.GroupLayer_16bit, psapi.GroupLayer_32bit]
 
 
 def convert_exr(image_file: str) -> str:
@@ -21,7 +28,7 @@ def convert_exr(image_file: str) -> str:
     # We assume image_file is an exr in ACEScg colorspace.
     path, filename = os.path.split(image_file)
     file, ext = os.path.splitext(filename)
-    converted_file = path + "/" + file + ".png"
+    converted_file = os.path.join(path, file + ".png")
 
     # read image
     inbuffer = ImageBuf(image_file)
@@ -39,7 +46,7 @@ def convert_exr(image_file: str) -> str:
     return converted_file
 
 
-def get_images_from_folder(path: str, extension: str) -> list:
+def get_images_from_folder(path: str, extension: str) -> List[str]:
     '''
     Parse a dir and all subfolders and add all files with the specified extension to a list.
 
@@ -59,6 +66,29 @@ def get_images_from_folder(path: str, extension: str) -> list:
                 files_found.append(os.path.join(dirpath, i))
 
     return files_found
+
+
+def parse_carpaint_filename(filename: str) -> Tuple[str, str]:
+    '''
+    Extract the carpaint color name and its render-pass group name from a
+    render filename, e.g. "0001renderRenderBlue_PhytonicBlueMetallic_v001.exr".
+
+    Args:
+        filename (str): Render filename (not a full path)
+
+    Returns:
+        Tuple[str, str]: (color_name, group_name)
+
+    Raises:
+        ValueError: If the filename does not match the expected naming convention.
+    '''
+    group_match = re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename)
+    color_match = re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename)
+
+    if not group_match or not color_match:
+        raise ValueError(f"Filename does not match expected carpaint render naming convention: {filename}")
+
+    return color_match[0], group_match[0]
 
 
 def load_image(filepath: str) -> np.ndarray:
@@ -85,7 +115,7 @@ def load_image(filepath: str) -> np.ndarray:
     return transformed_image
 
 
-def export_layers(filepath: str, out_path: str):
+def export_layers(filepath: str, out_path: str) -> None:
     '''
     Parse Phgotoshop file for image layers and call function to write them to disc.
 
@@ -111,7 +141,7 @@ def export_layers(filepath: str, out_path: str):
             write_layer(layer, out_path)
 
 
-def write_layer(layer: psapi.ImageLayer_8bit, out_path: str):
+def write_layer(layer: psapi.ImageLayer_8bit, out_path: str) -> None:
     '''
     Write a given Photoshop layer to disc.
 
@@ -131,10 +161,10 @@ def write_layer(layer: psapi.ImageLayer_8bit, out_path: str):
     # pack array for right order
     packed_array = np.dstack((B, G, R, A))
 
-    cv2.imwrite(out_path + "/" + name + ".png", packed_array)
+    cv2.imwrite(os.path.join(out_path, name + ".png"), packed_array)
 
 
-def create_ps_file(width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int):
+def create_ps_file(width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int) -> LayeredFile:
     '''
     Create a layered Photoshop file object
 
@@ -145,7 +175,7 @@ def create_ps_file(width: int, height: int, color_mode: psapi.enum.ColorMode, bi
         bitdepth (int): color depth, can be 8, 16 or 32
 
     Returns:
-        psapi.LayeredFile_*N*bit: layered Photoshop file object
+        LayeredFile: layered Photoshop file object
     '''
 
     if bitdepth == 8:
@@ -154,22 +184,32 @@ def create_ps_file(width: int, height: int, color_mode: psapi.enum.ColorMode, bi
         ps_document = psapi.LayeredFile_16bit(color_mode, width, height)
     elif bitdepth == 32:
         ps_document = psapi.LayeredFile_32bit(color_mode, width, height)
+    else:
+        raise ValueError(f"Unsupported bitdepth: {bitdepth}. Must be 8, 16 or 32.")
 
     return ps_document
 
 
-def read_ps_file(filepath):
+def read_ps_file(filepath: str) -> Tuple[LayeredFile, int, int, "psapi.enum.BitDepth"]:
+    '''
+    Read a Photoshop file from disc and return the document along with its dimensions and bit depth.
 
+    Args:
+        filepath (str): Filepath to the Photoshop file
+
+    Returns:
+        Tuple[LayeredFile, int, int, psapi.enum.BitDepth]: The document, width, height and bit depth.
+    '''
     ps_document = psapi.LayeredFile.read(filepath)
 
     width = ps_document.width
     height = ps_document.height
-    bit_depth: psapi.enum.BitDepth = psapi.PhotoshopFile.find_bitdepth(filepath)
+    bit_depth = psapi.PhotoshopFile.find_bitdepth(filepath)
 
     return ps_document, width, height, bit_depth
 
 
-def create_layer(image, width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str):
+def create_layer(image: np.ndarray, width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str) -> Layer:
     '''
     Create a Photoshop layer object.
 
@@ -182,7 +222,7 @@ def create_layer(image, width: int, height: int, color_mode: psapi.enum.ColorMod
         name (str): layer name
 
     Returns:
-        psapi.Layer_*N*bit: layer object
+        Layer: layer object
     '''
 
     # Construct our layer instance, width and height must be specified for this to work!
@@ -192,11 +232,13 @@ def create_layer(image, width: int, height: int, color_mode: psapi.enum.ColorMod
         layer = psapi.ImageLayer_16bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
     elif bitdepth == 32:
         layer = psapi.ImageLayer_32bit(image, layer_name=name, width=width, height=height, color_mode=color_mode)
+    else:
+        raise ValueError(f"Unsupported bitdepth: {bitdepth}. Must be 8, 16 or 32.")
 
     return layer
 
 
-def create_group_layer(width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str):
+def create_group_layer(width: int, height: int, color_mode: psapi.enum.ColorMode, bitdepth: int, name: str) -> GroupLayer:
     '''
     Create a group layer object.
 
@@ -208,7 +250,7 @@ def create_group_layer(width: int, height: int, color_mode: psapi.enum.ColorMode
         name (str): group layer name
 
     Returns:
-        psapi.GroupLayer_*N*bit: group layer object
+        GroupLayer: group layer object
     '''
     # Construct our layer instance, width and height must be specified for this to work!
     if bitdepth == 8:
@@ -217,26 +259,47 @@ def create_group_layer(width: int, height: int, color_mode: psapi.enum.ColorMode
         group_layer = psapi.GroupLayer_16bit(layer_name=name, width=width, height=height, color_mode=color_mode)
     elif bitdepth == 32:
         group_layer = psapi.GroupLayer_32bit(layer_name=name, width=width, height=height, color_mode=color_mode)
+    else:
+        raise ValueError(f"Unsupported bitdepth: {bitdepth}. Must be 8, 16 or 32.")
 
     return group_layer
 
 
-def add_layer_to_group(ps_document: psapi.LayeredFile_8bit, layer: psapi.Layer_8bit, group_layer: psapi.GroupLayer_8bit):
-    # add a ps layer to a layer group
+def add_layer_to_group(ps_document: LayeredFile, layer: Layer, group_layer: GroupLayer) -> None:
+    '''
+    Add a Photoshop layer to a layer group.
+
+    Args:
+        ps_document (LayeredFile): Photoshop document the layer belongs to
+        layer (Layer): Layer to add
+        group_layer (GroupLayer): Group layer to add the layer to
+    '''
     group_layer.add_layer(ps_document, layer)
 
 
-def add_layer_to_document(ps_document: psapi.LayeredFile_8bit, layer: psapi.Layer_8bit):
-    # layer can be group layer or image layer
+def add_layer_to_document(ps_document: LayeredFile, layer: Layer) -> None:
+    '''
+    Add a layer (image or group) to the top level of a Photoshop document.
+
+    Args:
+        ps_document (LayeredFile): Photoshop document to add the layer to
+        layer (Layer): Layer or group layer to add
+    '''
     ps_document.add_layer(layer)
 
 
-def save_ps(ps_document: psapi.LayeredFile_8bit, filepath: str):
-    # save a ps file to disc
+def save_ps(ps_document: LayeredFile, filepath: str) -> None:
+    '''
+    Save a Photoshop document to disc.
+
+    Args:
+        ps_document (LayeredFile): Photoshop document to save
+        filepath (str): Destination filepath
+    '''
     ps_document.write(filepath)
 
 
-def get_size(filepath:str) -> int:
+def get_size(filepath: str) -> Optional[Tuple[int, int]]:
     '''
     Get the pixel resolution of a given image file
 
@@ -244,7 +307,7 @@ def get_size(filepath:str) -> int:
         filepath (str): Filepath of the file
 
     Returns:
-        int: Pixel dimensions in X and Y
+        Optional[Tuple[int, int]]: (width, height) in pixels, or None if the file could not be opened.
     '''
 
     inbuffer = oiio.ImageInput.open(filepath)
@@ -257,8 +320,20 @@ def get_size(filepath:str) -> int:
 
         return width, height
 
+    return None
 
-def ingest(filepath: str):
+
+def ingest(filepath: str) -> None:
+    '''
+    Build a layered Photoshop document from a folder of rendered EXR frames.
+
+    Reads every ``.exr`` file below filepath, converts each to sRGB PNG, and
+    adds it to a new Photoshop document as an image layer, grouped by render
+    pass (base car vs. two-tone roof vs. individual carpaint colors).
+
+    Args:
+        filepath (str): Root folder to search for .exr render files.
+    '''
     # set env var for color conversion
     os.environ["OCIO"] = "Z:/OCIO/aces_1.2/config.ocio"
 
@@ -268,31 +343,46 @@ def ingest(filepath: str):
     # get exr files from folder
     exr_files = get_images_from_folder(filepath, "exr") or []
 
+    if not exr_files:
+        raise FileNotFoundError(f"No .exr files found under {filepath}")
+
     # get the pixel dimensions from the first exr file. We assume all files have the same size.
-    width, height = get_size(exr_files[0])
+    size = get_size(exr_files[0])
+    if size is None:
+        raise ValueError(f"Could not read image dimensions from {exr_files[0]}")
+    width, height = size
 
     # create a Photoshop doc with the right colormode and dimensions
     ps_document = create_ps_file(width, height, colormode, 8)
 
     # create a list of needed group layers
     group_layer_names = []
+    car_group_name: Optional[str] = None
+    twotone_group_name: Optional[str] = None
 
     for file in exr_files:
         filename = os.path.basename(file)
 
         if "renderRenderCar" in filename:
             car_group_name = "Car"
+            continue
 
         elif "TwoTone" in filename:
             twotone_group_name = "Two Tone"
+            continue
 
         else:
-            group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
+            _, group_name = parse_carpaint_filename(filename)
 
         group_layer_names.append(group_name)
 
+    if car_group_name is None:
+        raise ValueError("No 'renderRenderCar' file found - cannot determine the base car group.")
+    if twotone_group_name is None:
+        raise ValueError("No 'TwoTone' file found - cannot determine the two-tone group.")
+
     # convert to a set, back to a list and sort it to get rid of duplicates
-    group_layer_names = sorted(list(set(group_layer_names)))
+    group_layer_names = sorted(set(group_layer_names))
 
     # add base car and two tone groups. Car group will be at the bottom, two tone at the top
     group_layer_names.insert(0, twotone_group_name)
@@ -330,8 +420,7 @@ def ingest(filepath: str):
             group_name = "Two Tone"
 
         else:
-            layer_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
-            group_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
+            layer_name, group_name = parse_carpaint_filename(filename)
 
         # convert exr file
         png_image = convert_exr(file)
@@ -340,13 +429,19 @@ def ingest(filepath: str):
         layer_image = load_image(png_image)
         layer = create_layer(layer_image, width, height, colormode, 8, layer_name)
 
-        # add_layer_to_document(ps_document, layer)
         add_layer_to_group(ps_document, layer, group_layer_dict[group_name])
 
     save_ps(ps_document, "C:/Users/florianbehr/Desktop/configurator/BMW_config.psd")
 
 
-def compose(filepath):
+def compose(filepath: str) -> None:
+    '''
+    Composite each carpaint render over the base car render and the two-tone
+    gray roof render, writing one output PNG per color.
+
+    Args:
+        filepath (str): Root folder to search for .exr render files.
+    '''
     # set env var for color conversion
     os.environ["OCIO"] = "Z:/OCIO/aces_1.2/config.ocio"
 
@@ -354,6 +449,8 @@ def compose(filepath):
     exr_files = get_images_from_folder(filepath, "exr") or []
 
     carpaint_renders = []
+    car_render: Optional[str] = None
+    twotonegray_render: Optional[str] = None
 
     for file in exr_files:
         filename = os.path.basename(file)
@@ -361,17 +458,19 @@ def compose(filepath):
         if "renderRenderCar" in filename:
             car_render = file
 
-        elif "TwoToneBlack" in filename:
-            twotoneblack_render = file
-
-        elif "TwoToneGray" in filename:
-            twotonegray_render = file
+        elif "TwoTone" in filename:
+            if "TwoToneGray" in filename:
+                twotonegray_render = file
 
         else:
             carpaint_renders.append(file)
 
+    if car_render is None:
+        raise ValueError("No 'renderRenderCar' file found - cannot determine the base car render.")
+    if twotonegray_render is None:
+        raise ValueError("No 'TwoToneGray' file found - cannot determine the two-tone gray render.")
+
     car_buf = ImageBuf(car_render)
-    twotoneblack_buf = ImageBuf(twotoneblack_render)
     twotonegray_buf = ImageBuf(twotonegray_render)
 
     for file in carpaint_renders:
@@ -380,30 +479,21 @@ def compose(filepath):
 
         print(f"Processing {filename}")
 
-        # get layer and group name
-        if "renderRenderCar" in filename:
-            continue
+        color_name, colorgroup_name = parse_carpaint_filename(filename)
+        carpaint_buf = ImageBuf(file)
 
-        elif "TwoTone" in filename:
-            continue
+        comp1_buf = ImageBufAlgo.over(carpaint_buf, car_buf)
+        comp2_buf = ImageBufAlgo.over(twotonegray_buf, comp1_buf)
 
-        elif "TwoToneGray" in filename:
-            continue
+        # convert from ACEScg to sRGB
+        out_buf = ImageBufAlgo.colorconvert(comp2_buf, "ACES - ACEScg", "out_srgb")
 
-        else:
-            color_name = (re.findall(r"[0-9a-zA-z]*renderRender[a-zA-Z]*_([0-9a-zA-z]*)_[a-zA-Z0-9.]*", filename))[0]
-            colorgroup_name = (re.findall(r"[0-9a-zA-z]*renderRender([a-zA-Z]*)_[0-9a-zA-z.]*", filename))[0]
-            carpaint_buf = ImageBuf(file)
+        out_filename = f"{colorgroup_name}_{color_name}.png"
 
-            comp1_buf = ImageBufAlgo.over(carpaint_buf, car_buf)
-            comp2_buf = ImageBufAlgo.over(twotonegray_buf, comp1_buf)
-
-            # convert from ACEScg to sRGB
-            out_buf = ImageBufAlgo.colorconvert(comp2_buf, "ACES - ACEScg", "out_srgb")
-
-            # write image in 8 Bit
-            out_buf.write("C:/Users/florianbehr/Desktop/configurator/output/" + colorgroup_name + "_" + color_name + ".png", "uint8")
+        # write image in 8 Bit
+        out_buf.write(os.path.join("C:/Users/florianbehr/Desktop/configurator/output", out_filename), "uint8")
 
 
-ingest("C:/Users/florianbehr/Desktop/configurator/renders")
-# compose("C:/Users/florianbehr/Desktop/configurator/renders")
+if __name__ == "__main__":
+    ingest("C:/Users/florianbehr/Desktop/configurator/renders")
+    # compose("C:/Users/florianbehr/Desktop/configurator/renders")
