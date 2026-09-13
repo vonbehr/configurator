@@ -323,7 +323,7 @@ def get_size(filepath: str) -> Optional[Tuple[int, int]]:
     return None
 
 
-def ingest(filepath: str) -> None:
+def ingest(filepath: str, output_path_ str, ocio_path: str) -> None:
     '''
     Build a layered Photoshop document from a folder of rendered EXR frames.
 
@@ -335,7 +335,7 @@ def ingest(filepath: str) -> None:
         filepath (str): Root folder to search for .exr render files.
     '''
     # set env var for color conversion
-    os.environ["OCIO"] = "Z:/OCIO/aces_1.2/config.ocio"
+    os.environ["OCIO"] = ocio_path
 
     # colormode of the ps doc
     colormode = psapi.enum.ColorMode.rgb
@@ -431,10 +431,10 @@ def ingest(filepath: str) -> None:
 
         add_layer_to_group(ps_document, layer, group_layer_dict[group_name])
 
-    save_ps(ps_document, "C:/Users/florianbehr/Desktop/configurator/BMW_config.psd")
+    save_ps(ps_document, output_path)
 
 
-def compose(filepath: str) -> None:
+def compose(filepath: str, output_path: str, ocio_path: str) -> None:
     '''
     Composite each carpaint render over the base car render and the two-tone
     gray roof render, writing one output PNG per color.
@@ -443,7 +443,7 @@ def compose(filepath: str) -> None:
         filepath (str): Root folder to search for .exr render files.
     '''
     # set env var for color conversion
-    os.environ["OCIO"] = "Z:/OCIO/aces_1.2/config.ocio"
+    os.environ["OCIO"] = ocio_path
 
     # get exr files from folder
     exr_files = get_images_from_folder(filepath, "exr") or []
@@ -491,9 +491,12 @@ def compose(filepath: str) -> None:
         out_filename = f"{colorgroup_name}_{color_name}.png"
 
         # write image in 8 Bit
-        out_buf.write(os.path.join("C:/Users/florianbehr/Desktop/configurator/output", out_filename), "uint8")
+        out_buf.write(os.path.join(output_path, out_filename), "uint8")
 
 
 if __name__ == "__main__":
-    ingest("C:/Users/florianbehr/Desktop/configurator/renders")
-    # compose("C:/Users/florianbehr/Desktop/configurator/renders")
+    # create Photoshop composites
+    ingest("//PATH/TO/RENDERS")
+
+    # create PNG composites
+    # compose("//PATH/TO/RENDERS")
